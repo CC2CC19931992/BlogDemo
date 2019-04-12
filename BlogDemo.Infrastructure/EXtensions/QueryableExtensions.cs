@@ -15,7 +15,7 @@ namespace BlogDemo.Infrastructure.Extensions
         /// 作用于IQueryable<T>【Ef的查询类型】
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="source"></param>
+        /// <param name="source">针对于IQueryable<T>接口类型的扩展方法</param>
         /// <param name="orderBy"></param>
         /// <param name="propertyMapping"></param>
         /// <returns></returns>
