@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,7 +41,12 @@ namespace BlogDemo.Api
                 options => {
                     options.ReturnHttpNotAcceptable = true;//设置为true表示只能返回指定格式的内容，否则就会报406的错误
                     options.OutputFormatters.Add(new XmlDataContractSerializerOutputFormatter());//新增输出的格式（指定返回的格式类型为xml）
-                });
+                })
+                .AddJsonOptions(options=> {
+                    //所有的返回实体输出格式为前端规范的首字母小写的CamelCase规范
+                    options.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+                })
+                ;
 
             //将自定义的MyContext注册到容器里，使用的时候在使用的类里面进行依赖注入即可
             services.AddDbContext<MyContext>(options =>

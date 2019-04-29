@@ -2,6 +2,7 @@
 using BlogDemo.Core.Entities;
 using BlogDemo.Core.Interfaces;
 using BlogDemo.Infrastructure.Database;
+using BlogDemo.Infrastructure.Extensions;
 using BlogDemo.Infrastructure.Resources;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +54,8 @@ namespace BlogDemo.Api.Controllers
             //var a =postList.FirstOrDefault();
             var postResource = _mapper.Map<IEnumerable<Post>, IEnumerable<PostResource>>(postList);
 
+            var shapedPostResources = postResource.ToDynamicIEnumerable(postParameters.Fields);//实现集合资源塑形
+
             var previousPageLink = postList.HasPrevious ?//如果有前一页，则生成前一页链接
              CreatePostUri(postParameters,
                  PaginationResourceUriType.PreviousPage) : null;//生成前一页的链接
@@ -79,11 +82,12 @@ namespace BlogDemo.Api.Controllers
             //throw new Exception("Error!!!!!");
             //_logger.LogInformation("Get All Posts......");
             //_loggerF.LogError("Get All Posts......");
-            return Ok(postResource);
+            //return Ok(postResource);
+            return Ok(shapedPostResources);//塑形后返回结果
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> Get(int id)
+        public async Task<IActionResult> Get(int id, string fields = null)
         {
             var post =await _postRepository.GetPostByIdAsync(id);
             if(post == null)
@@ -91,7 +95,10 @@ namespace BlogDemo.Api.Controllers
                 return NotFound();
             }
             var postResource = _mapper.Map<Post, PostResource>(post);
-            return Ok(postResource);
+            var shapedPostResource = postResource.ToDynamic(fields);//实现单个对象的塑形
+
+            //return Ok(postResource);
+            return Ok(shapedPostResource);
         }
 
 
