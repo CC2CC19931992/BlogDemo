@@ -81,6 +81,8 @@ namespace BlogDemo.Api
             var propertyMappingContainer = new PropertyMappingContainer();
             propertyMappingContainer.Register<PostPropertyMapping>();
             services.AddSingleton<IPropertyMappingContainer>(propertyMappingContainer);
+
+            services.AddTransient<ITypeHelperService, TypeHelperService>();//注册TypeHelperService服务
         }
 
 

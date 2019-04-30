@@ -4,6 +4,7 @@ using BlogDemo.Core.Interfaces;
 using BlogDemo.Infrastructure.Database;
 using BlogDemo.Infrastructure.Extensions;
 using BlogDemo.Infrastructure.Resources;
+using BlogDemo.Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -27,7 +28,8 @@ namespace BlogDemo.Api.Controllers
         private readonly IConfiguration _configuration;
         private readonly IMapper _mapper;
         private readonly IUrlHelper _urlHelper;
-
+        private readonly ITypeHelperService _typeHelperService;
+        private readonly IPropertyMappingContainer _propertyMappingContainer;
         public PostController(
             IPostRepository postRepository,
             IUnitOfWork unitOfWork,
@@ -35,7 +37,9 @@ namespace BlogDemo.Api.Controllers
             ILoggerFactory loggerFactory,
             IConfiguration configuration,
             IMapper mapper,
-            IUrlHelper urlHelper)
+            IUrlHelper urlHelper,
+            ITypeHelperService typeHelperService,
+            IPropertyMappingContainer propertyMappingContainer)
         {
             _postRepository = postRepository;
             _unitOfWork = unitOfWork;
@@ -44,12 +48,26 @@ namespace BlogDemo.Api.Controllers
             _configuration = configuration;
             _mapper = mapper;//将AutoMapper注入到这个PostController中
             _urlHelper = urlHelper;
+            _typeHelperService = typeHelperService;
+            _propertyMappingContainer = propertyMappingContainer;
         }
 
 
         [HttpGet(Name ="GetPosts")]//给方法取个名叫GetPosts
         public async Task<IActionResult> Get(PostParameters postParameters)
         {
+            if (!_propertyMappingContainer.ValidateMappingExistsFor<PostResource, Post>(postParameters.OrderBy))
+            {
+                //如果需要查询排序的字段不存在，则返回400错误
+                return BadRequest("Can't finds fields for sorting");
+            }
+
+            if (!_typeHelperService.TypeHasProperties<PostResource>(postParameters.Fields))
+            {
+                //如果需要查询的字段不存在，则返回400错误
+                return BadRequest("Fields not exist.");
+            }
+
             var postList = await _postRepository.GetAllPostsAsync(postParameters);
             //var a =postList.FirstOrDefault();
             var postResource = _mapper.Map<IEnumerable<Post>, IEnumerable<PostResource>>(postList);
@@ -89,6 +107,13 @@ namespace BlogDemo.Api.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> Get(int id, string fields = null)
         {
+            //这里是查询单个 所以不需要对排序的字段做验证
+            if (!_typeHelperService.TypeHasProperties<PostResource>(fields))
+            {
+                //如果需要查询的字段不存在，则返回400错误
+                return BadRequest("Fields not exist.");
+            }
+
             var post =await _postRepository.GetPostByIdAsync(id);
             if(post == null)
             {
