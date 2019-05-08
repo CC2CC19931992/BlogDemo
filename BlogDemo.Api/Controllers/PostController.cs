@@ -52,7 +52,7 @@ namespace BlogDemo.Api.Controllers
             _propertyMappingContainer = propertyMappingContainer;
         }
 
-
+        //获取集合资源
         [HttpGet(Name ="GetPosts")]//给方法取个名叫GetPosts
         public async Task<IActionResult> Get(PostParameters postParameters)
         {
@@ -73,6 +73,15 @@ namespace BlogDemo.Api.Controllers
             var postResource = _mapper.Map<IEnumerable<Post>, IEnumerable<PostResource>>(postList);
 
             var shapedPostResources = postResource.ToDynamicIEnumerable(postParameters.Fields);//实现集合资源塑形
+
+            //为每个资源创建一个links 并带到返回结果中，这里用的是循环，使用的是动态类型
+            var shapedWithLinks = shapedPostResources.Select(x => 
+            {
+                var dict = x as IDictionary<string, object>;
+                var links = CreateLinksForPost((int)dict["Id"], postParameters.Fields);
+                dict.Add("links", links);
+                return dict;
+            });
 
             var previousPageLink = postList.HasPrevious ?//如果有前一页，则生成前一页链接
              CreatePostUri(postParameters,
@@ -101,10 +110,11 @@ namespace BlogDemo.Api.Controllers
             //_logger.LogInformation("Get All Posts......");
             //_loggerF.LogError("Get All Posts......");
             //return Ok(postResource);
-            return Ok(shapedPostResources);//塑形后返回结果
+            return Ok(shapedWithLinks);//塑形后返回结果
         }
 
-        [HttpGet("{id}")]
+        //获取单个资源
+        [HttpGet("{id}",Name ="GetPost")]
         public async Task<IActionResult> Get(int id, string fields = null)
         {
             //这里是查询单个 所以不需要对排序的字段做验证
@@ -122,8 +132,12 @@ namespace BlogDemo.Api.Controllers
             var postResource = _mapper.Map<Post, PostResource>(post);
             var shapedPostResource = postResource.ToDynamic(fields);//实现单个对象的塑形
 
+            //创建资源链接
+            var links = CreateLinksForPost(id,fields);
+            var result = shapedPostResource as IDictionary<string,Object>;
+            result.Add("links", links);
             //return Ok(postResource);
-            return Ok(shapedPostResource);
+            return Ok(result);
         }
 
 
@@ -180,6 +194,81 @@ namespace BlogDemo.Api.Controllers
                     return _urlHelper.Link("GetPosts", currentParameters);
             }
         }
+
+
+
+        /// <summary>
+        /// 为单个资源创建资源相关链接
+        /// </summary>
+        /// <param name="id">post的主键</param>
+        /// <param name="fields">表示相关的链接的字段（塑形的字段）</param>
+        /// <returns></returns>
+        private IEnumerable<LinkResource> CreateLinksForPost(int id, string fields = null)
+        {
+            var links = new List<LinkResource>();
+
+            if (string.IsNullOrWhiteSpace(fields))
+            {
+                links.Add(
+                    new LinkResource(
+                        //GetPost是Action的名，也就是这个页面的 async Task<IActionResult> Get(int id, string fields = null)方法
+                        // [HttpGet("{id}",Name ="GetPost")]
+                        //第二个参数id使用的是匿名类，而fields不需要塑形 所以可以不用传
+                        _urlHelper.Link("GetPost", new { id }), "self", "GET"));
+            }
+            else
+            {
+                //这边是需要塑形的 因为fields不为空
+                links.Add(
+                    new LinkResource(
+                        _urlHelper.Link("GetPost", new { id, fields }), "self", "GET"));
+            }
+
+            
+            //先新增删除字段的link Action暂时没做
+            links.Add(
+                new LinkResource(
+                    _urlHelper.Link("DeletePost", new { id }), "delete_post", "DELETE"));
+
+            return links;
+        }
+
+        /// <summary>
+        /// 为多个资源创建资源相关链接
+        /// </summary>
+        /// <param name="postResourceParameters"></param>
+        /// <param name="hasPrevious"></param>
+        /// <param name="hasNext"></param>
+        /// <returns></returns>
+        private IEnumerable<LinkResource> CreateLinksForPosts(PostParameters postResourceParameters,
+    bool hasPrevious, bool hasNext)
+        {
+            var links = new List<LinkResource>
+            {
+                new LinkResource(
+                    CreatePostUri(postResourceParameters, PaginationResourceUriType.CurrentPage),
+                    "self", "GET")
+            };
+
+            if (hasPrevious)
+            {
+                links.Add(
+                    new LinkResource(
+                        CreatePostUri(postResourceParameters, PaginationResourceUriType.PreviousPage),
+                        "previous_page", "GET"));
+            }
+
+            if (hasNext)
+            {
+                links.Add(
+                    new LinkResource(
+                        CreatePostUri(postResourceParameters, PaginationResourceUriType.NextPage),
+                        "next_page", "GET"));
+            }
+
+            return links;
+        }
+
 
     }
 }
