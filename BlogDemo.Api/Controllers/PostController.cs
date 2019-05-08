@@ -54,7 +54,8 @@ namespace BlogDemo.Api.Controllers
 
         //获取集合资源
         [HttpGet(Name ="GetPosts")]//给方法取个名叫GetPosts
-        public async Task<IActionResult> Get(PostParameters postParameters)
+        public async Task<IActionResult> Get(PostParameters postParameters,
+            [FromHeader(Name ="Accept")] string mediaType)//新增媒体类型参数
         {
             if (!_propertyMappingContainer.ValidateMappingExistsFor<PostResource, Post>(postParameters.OrderBy))
             {
@@ -71,55 +72,85 @@ namespace BlogDemo.Api.Controllers
             var postList = await _postRepository.GetAllPostsAsync(postParameters);
             //var a =postList.FirstOrDefault();
             var postResource = _mapper.Map<IEnumerable<Post>, IEnumerable<PostResource>>(postList);
-
-            var shapedPostResources = postResource.ToDynamicIEnumerable(postParameters.Fields);//实现集合资源塑形
-
-            //为每个资源创建一个links 并带到返回结果中，这里用的是循环，使用的是动态类型
-            var shapedWithLinks = shapedPostResources.Select(x => 
+            //如果Headers里面有注明输出的媒体类型为application/vnd.cgzl.hateoas+json 则走下面，带links的
+            if (mediaType == "application/vnd.cgzl.hateoas+json")
             {
-                var dict = x as IDictionary<string, object>;
-                var postLinks = CreateLinksForPost((int)dict["Id"], postParameters.Fields);
-                dict.Add("links", postLinks);
-                return dict;
-            });
+                var shapedPostResources = postResource.ToDynamicIEnumerable(postParameters.Fields);//实现集合资源塑形
 
-            var links = CreateLinksForPosts(postParameters, postList.HasPrevious, postList.HasNext);
+                //为每个资源创建一个links 并带到返回结果中，这里用的是循环，使用的是动态类型
+                var shapedWithLinks = shapedPostResources.Select(x =>
+                {
+                    var dict = x as IDictionary<string, object>;
+                    var postLinks = CreateLinksForPost((int)dict["Id"], postParameters.Fields);
+                    dict.Add("links", postLinks);
+                    return dict;
+                });
 
-            var result = new
+                var links = CreateLinksForPosts(postParameters, postList.HasPrevious, postList.HasNext);
+
+                var result = new
+                {
+                    value = shapedWithLinks,
+                    links
+                };
+
+                //var previousPageLink = postList.HasPrevious ?//如果有前一页，则生成前一页链接
+                // CreatePostUri(postParameters,
+                //     PaginationResourceUriType.PreviousPage) : null;//生成前一页的链接
+
+                //var nextPageLink = postList.HasNext ?//如果有后一页，则生成后一页链接
+                //    CreatePostUri(postParameters,
+                //        PaginationResourceUriType.NextPage) : null;//生成后一页的链接
+
+                var meta = new
+                {
+                    postList.PageSize,
+                    postList.PageIndex,
+                    postList.TotalItemsCount,
+                    postList.PageCount,
+                    //前一页后一页都通过CreateLinksForPosts来获得，则返回的元数据里可以将这两个属性去掉
+                    //previousPageLink,
+                    //nextPageLink
+                };
+                Response.Headers.Add("X-Pagination",
+                    JsonConvert.SerializeObject(meta,
+                    //加上这个设定是将head转换成前端规范的首字母小写的CamelCase规范
+                    new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() }
+                    ));
+                //var v = _configuration["Key1"];//当Key1发生变化时 重新跑下这里也会加载最新的
+                //throw new Exception("Error!!!!!");
+                //_logger.LogInformation("Get All Posts......");
+                //_loggerF.LogError("Get All Posts......");
+                //return Ok(postResource);
+                return Ok(result);//塑形后返回结果
+            }
+            else
             {
-                value = shapedWithLinks,
-                links
-            };
+                var previousPageLink = postList.HasPrevious ?
+               CreatePostUri(postParameters,
+                   PaginationResourceUriType.PreviousPage) : null;
 
-            //var previousPageLink = postList.HasPrevious ?//如果有前一页，则生成前一页链接
-            // CreatePostUri(postParameters,
-            //     PaginationResourceUriType.PreviousPage) : null;//生成前一页的链接
+                var nextPageLink = postList.HasNext ?
+                    CreatePostUri(postParameters,
+                        PaginationResourceUriType.NextPage) : null;
 
-            //var nextPageLink = postList.HasNext ?//如果有后一页，则生成后一页链接
-            //    CreatePostUri(postParameters,
-            //        PaginationResourceUriType.NextPage) : null;//生成后一页的链接
+                var meta = new
+                {
+                    postList.TotalItemsCount,
+                    postList.PageSize,
+                    postList.PageIndex,
+                    postList.PageCount,
+                    previousPageLink,
+                    nextPageLink
+                };
 
-            var meta = new
-            {
-                postList.PageSize,
-                postList.PageIndex,
-                postList.TotalItemsCount,
-                postList.PageCount,
-                //前一页后一页都通过CreateLinksForPosts来获得，则返回的元数据里可以将这两个属性去掉
-                //previousPageLink,
-                //nextPageLink
-            };
-            Response.Headers.Add("X-Pagination", 
-                JsonConvert.SerializeObject(meta,
-                //加上这个设定是将head转换成前端规范的首字母小写的CamelCase规范
-                new JsonSerializerSettings { ContractResolver=new CamelCasePropertyNamesContractResolver() }
-                ));
-            //var v = _configuration["Key1"];//当Key1发生变化时 重新跑下这里也会加载最新的
-            //throw new Exception("Error!!!!!");
-            //_logger.LogInformation("Get All Posts......");
-            //_loggerF.LogError("Get All Posts......");
-            //return Ok(postResource);
-            return Ok(result);//塑形后返回结果
+                Response.Headers.Add("X-Pagination", JsonConvert.SerializeObject(meta, new JsonSerializerSettings
+                {
+                    ContractResolver = new CamelCasePropertyNamesContractResolver()
+                }));
+
+                return Ok(postResource.ToDynamicIEnumerable(postParameters.Fields));
+            }
         }
 
         //获取单个资源

@@ -40,7 +40,14 @@ namespace BlogDemo.Api
             services.AddMvc(
                 options => {
                     options.ReturnHttpNotAcceptable = true;//设置为true表示只能返回指定格式的内容，否则就会报406的错误
-                    options.OutputFormatters.Add(new XmlDataContractSerializerOutputFormatter());//新增输出的格式（指定返回的格式类型为xml）
+                    //options.OutputFormatters.Add(new XmlDataContractSerializerOutputFormatter());//新增输出的格式（指定返回的格式类型为xml）
+
+                    //注册自定义输出格式媒体类型
+                    var outputFormatter = options.OutputFormatters.OfType<JsonOutputFormatter>().FirstOrDefault();
+                    if (outputFormatter != null)
+                    {
+                        outputFormatter.SupportedMediaTypes.Add("application/vnd.cgzl.hateoas+json");
+                    }
                 })
                 .AddJsonOptions(options=> {
                     //所有的返回实体输出格式为前端规范的首字母小写的CamelCase规范
