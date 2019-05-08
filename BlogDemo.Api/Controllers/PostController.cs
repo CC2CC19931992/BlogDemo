@@ -78,18 +78,26 @@ namespace BlogDemo.Api.Controllers
             var shapedWithLinks = shapedPostResources.Select(x => 
             {
                 var dict = x as IDictionary<string, object>;
-                var links = CreateLinksForPost((int)dict["Id"], postParameters.Fields);
-                dict.Add("links", links);
+                var postLinks = CreateLinksForPost((int)dict["Id"], postParameters.Fields);
+                dict.Add("links", postLinks);
                 return dict;
             });
 
-            var previousPageLink = postList.HasPrevious ?//如果有前一页，则生成前一页链接
-             CreatePostUri(postParameters,
-                 PaginationResourceUriType.PreviousPage) : null;//生成前一页的链接
+            var links = CreateLinksForPosts(postParameters, postList.HasPrevious, postList.HasNext);
 
-            var nextPageLink = postList.HasNext ?//如果有后一页，则生成后一页链接
-                CreatePostUri(postParameters,
-                    PaginationResourceUriType.NextPage) : null;//生成后一页的链接
+            var result = new
+            {
+                value = shapedWithLinks,
+                links
+            };
+
+            //var previousPageLink = postList.HasPrevious ?//如果有前一页，则生成前一页链接
+            // CreatePostUri(postParameters,
+            //     PaginationResourceUriType.PreviousPage) : null;//生成前一页的链接
+
+            //var nextPageLink = postList.HasNext ?//如果有后一页，则生成后一页链接
+            //    CreatePostUri(postParameters,
+            //        PaginationResourceUriType.NextPage) : null;//生成后一页的链接
 
             var meta = new
             {
@@ -97,8 +105,9 @@ namespace BlogDemo.Api.Controllers
                 postList.PageIndex,
                 postList.TotalItemsCount,
                 postList.PageCount,
-                previousPageLink,
-                nextPageLink
+                //前一页后一页都通过CreateLinksForPosts来获得，则返回的元数据里可以将这两个属性去掉
+                //previousPageLink,
+                //nextPageLink
             };
             Response.Headers.Add("X-Pagination", 
                 JsonConvert.SerializeObject(meta,
@@ -110,7 +119,7 @@ namespace BlogDemo.Api.Controllers
             //_logger.LogInformation("Get All Posts......");
             //_loggerF.LogError("Get All Posts......");
             //return Ok(postResource);
-            return Ok(shapedWithLinks);//塑形后返回结果
+            return Ok(result);//塑形后返回结果
         }
 
         //获取单个资源
@@ -234,7 +243,7 @@ namespace BlogDemo.Api.Controllers
         }
 
         /// <summary>
-        /// 为多个资源创建资源相关链接
+        /// 为多个资源创建资源相关链接（前一页 后一页的链接）
         /// </summary>
         /// <param name="postResourceParameters"></param>
         /// <param name="hasPrevious"></param>
