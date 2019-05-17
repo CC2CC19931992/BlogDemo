@@ -150,6 +150,31 @@ namespace BlogDemo.Api.Controllers
             return Ok(result);
         }
 
+        [HttpPost(Name ="CreatePost")]
+        public async Task<IActionResult> Post([FromBody] PostAddResource postAddResource)
+        {
+            if(postAddResource == null)
+            {
+                return BadRequest();
+            }
+            var newPost = _mapper.Map<PostAddResource, Post>(postAddResource);
+            newPost.Author = "admin";
+            newPost.LastModified = DateTime.Now;
+            _postRepository.AddPost(newPost);
+            if(!await _unitOfWork.SaveAsync())
+            {
+                throw new Exception("Save Failed!");
+            }
+            var resultResource = _mapper.Map<Post, PostResource>(newPost);
+            //需要支持hateoas
+            var links = CreateLinksForPost(newPost.Id);
+            var linkedPostResource = resultResource.ToDynamic() as IDictionary<string, object>;
+            linkedPostResource.Add("links", links);
+
+            return CreatedAtRoute("GetPost",new { id= linkedPostResource["Id"]} , linkedPostResource);
+        }
+
+
 
         //获取单个资源
         [HttpGet("{id}", Name = "GetPost")]
@@ -179,23 +204,23 @@ namespace BlogDemo.Api.Controllers
         }
 
 
-        [HttpPost]
-        public async Task<IActionResult> Post()
-        {
-            var newPost = new Post
-            {
-                Author = "admin",
-                Body = "12123123213",
-                Title = "Titel xc",
-                LastModified = DateTime.Now
-            };
-            _postRepository.AddPost(newPost);
-            //为什么要将保存到数据库的操作单独放到UnitOfWork里而不放在Repository里
-            //Repository中文意思是仓储，类似于集合。集合有查询排序删除的操作，而保存
+        //[HttpPost]
+        //public async Task<IActionResult> Post()
+        //{
+        //    var newPost = new Post
+        //    {
+        //        Author = "admin",
+        //        Body = "12123123213",
+        //        Title = "Titel xc",
+        //        LastModified = DateTime.Now
+        //    };
+        //    _postRepository.AddPost(newPost);
+        //    //为什么要将保存到数据库的操作单独放到UnitOfWork里而不放在Repository里
+        //    //Repository中文意思是仓储，类似于集合。集合有查询排序删除的操作，而保存
 
-            await _unitOfWork.SaveAsync();
-            return Ok();
-        }
+        //    await _unitOfWork.SaveAsync();
+        //    return Ok();
+        //}
 
 
 

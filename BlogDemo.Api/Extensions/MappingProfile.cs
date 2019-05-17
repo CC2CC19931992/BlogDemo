@@ -20,6 +20,8 @@ namespace BlogDemo.Api.Extensions
             CreateMap<Post, PostResource>().ForMember(dest=>dest.UpdateTime,opt=>opt.MapFrom(src=>src.LastModified));
 
             CreateMap<PostResource, Post>();//建立了一个从postResource到post的映射
+
+            CreateMap<PostAddResource, Post>();
         }
     }
 }
